@@ -1,18 +1,17 @@
-# Gunakan image Python yang ringan
-FROM python:3.9-slim
+from fastapi import FastAPI
+from pydantic import BaseModel
+from sentence_transformers import SentenceTransformer, util
 
-# Set direktori kerja
-WORKDIR /app
+app = FastAPI()
+model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-# Salin file requirements dan aplikasi ke dalam container
-COPY requirements.txt .
-COPY app.py .
+class EssayRequest(BaseModel):
+    reference: str
+    essay: str
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Expose port 8081
-EXPOSE 8081
-
-# Jalankan aplikasi dengan Uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8081"]
+@app.post("/evaluate/")
+async def evaluate(data: EssayRequest):  # Pastikan parameter berasal dari request body
+    emb1 = model.encode(data.reference, convert_to_tensor=True)
+    emb2 = model.encode(data.essay, convert_to_tensor=True)
+    similarity = util.pytorch_cos_sim(emb1, emb2).item()
+    return {"similarity_score": similarity}
